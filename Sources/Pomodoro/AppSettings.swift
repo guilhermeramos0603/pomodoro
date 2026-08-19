@@ -1,5 +1,5 @@
+import AppKit
 import Combine
-import Foundation
 
 /// Observable wrapper around `SettingsData`, persisted to UserDefaults on every change.
 final class AppSettings: ObservableObject {
@@ -36,14 +36,21 @@ final class AppSettings: ObservableObject {
         data = fresh
     }
 
-    /// Panel geometry: the height always follows the base aspect ratio.
+    /// The size the timer content is drawn at when `contentScale` is 1.
     static let baseSize = CGSize(width: 250, height: 172)
-    static let minWidth: CGFloat = 170
-    static let maxWidth: CGFloat = 700
+    /// Smallest window that still fits the content legibly.
+    static let minSize = CGSize(width: 170, height: 120)
+    static let minContentScale = 0.5
+    static let maxContentScale = 3.0
 
+    /// The window can grow to the whole visible screen; the content does not follow it.
     var panelSize: CGSize {
-        let w = min(Self.maxWidth, max(Self.minWidth, CGFloat(data.windowWidth)))
-        return CGSize(width: w.rounded(), height: (w * Self.baseSize.height / Self.baseSize.width).rounded())
+        let limit = (NSScreen.main ?? NSScreen.screens.first)?.visibleFrame.size
+            ?? CGSize(width: 1440, height: 900)
+        return CGSize(
+            width: min(limit.width, max(Self.minSize.width, CGFloat(data.windowWidth))).rounded(),
+            height: min(limit.height, max(Self.minSize.height, CGFloat(data.windowHeight))).rounded()
+        )
     }
 
     /// Fills the custom sequence with what the classic settings would generate.

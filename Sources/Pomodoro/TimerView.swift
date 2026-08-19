@@ -1,7 +1,8 @@
 import SwiftUI
 
-/// The panel UI. Everything is sized from `s`, the ratio between the current window
-/// width and the base width — real point sizes, so text stays sharp at any size.
+/// The panel UI. Everything is sized from `s`, the content scale — real point sizes, so text
+/// stays sharp at any size. `s` is the size the user asked for, capped by what the window can
+/// fit: growing the window does not grow the timer, it just gives it more room around it.
 struct TimerView: View {
     @ObservedObject var engine: PomodoroEngine
     @ObservedObject var settings: AppSettings
@@ -14,7 +15,9 @@ struct TimerView: View {
 
     var body: some View {
         GeometryReader { geo in
-            let s = max(0.55, min(3.0, geo.size.width / AppSettings.baseSize.width))
+            let fits = min(geo.size.width / AppSettings.baseSize.width,
+                           geo.size.height / AppSettings.baseSize.height)
+            let s = max(0.45, min(fits, CGFloat(settings.data.contentScale)))
 
             ZStack {
                 Color.black.opacity(settings.data.tintOpacity)
@@ -28,6 +31,7 @@ struct TimerView: View {
                 }
                 .padding(.horizontal, 16 * s)
                 .padding(.vertical, 13 * s)
+                .frame(width: AppSettings.baseSize.width * s)
             }
         }
         .contextMenu {

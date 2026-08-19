@@ -14,7 +14,7 @@ struct SettingsView: View {
                 .tabItem { Label("Behaviour", systemImage: "slider.horizontal.3") }
         }
         .padding(14)
-        .frame(width: 470, height: 430)
+        .frame(width: 470, height: 480)
     }
 }
 
@@ -178,7 +178,8 @@ private struct AppearanceTab: View {
     @ObservedObject var settings: AppSettings
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
                     Text("Black opacity")
@@ -225,23 +226,41 @@ private struct AppearanceTab: View {
 
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
-                    Text("Size")
+                    Text("Timer size")
                     Spacer()
-                    Text("\(Int(settings.data.windowWidth)) pt wide")
+                    Text("\(Int(settings.data.contentScale * 100))%")
                         .monospacedDigit()
                         .foregroundColor(.secondary)
                 }
-                Slider(value: $settings.data.windowWidth,
-                       in: Double(AppSettings.minWidth)...Double(AppSettings.maxWidth))
-                Text("You can also drag the grip in the panel's bottom-right corner, or any of its edges.")
+                Slider(value: $settings.data.contentScale,
+                       in: AppSettings.minContentScale...AppSettings.maxContentScale)
+                Text("Only the timer itself — the digits, icons and labels. It is independent of "
+                     + "the window: a bigger panel gives the timer more empty room, not a bigger font.")
+                    .font(.caption).foregroundColor(.secondary)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text("Window")
+                    Spacer()
+                    Text("\(Int(settings.data.windowWidth)) × \(Int(settings.data.windowHeight))")
+                        .monospacedDigit()
+                        .foregroundColor(.secondary)
+                }
+                HStack {
+                    Button("Fill screen") { NotificationCenter.default.post(name: .pomodoroFillScreen, object: nil) }
+                    Button("Reset size") { NotificationCenter.default.post(name: .pomodoroResetSize, object: nil) }
+                    Spacer()
+                }
+                Text("Or drag the grip in the panel's bottom-right corner, or any of its edges.")
                     .font(.caption).foregroundColor(.secondary)
             }
 
             Toggle("Show on all Spaces and above full-screen apps", isOn: $settings.data.allSpaces)
-
-            Spacer()
+            }
+            .padding(.top, 14)
+            .padding(.trailing, 2)
         }
-        .padding(.top, 14)
     }
 }
 

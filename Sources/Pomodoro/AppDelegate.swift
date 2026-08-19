@@ -2,6 +2,11 @@ import AppKit
 import Combine
 import SwiftUI
 
+extension Notification.Name {
+    static let pomodoroFillScreen = Notification.Name("pomodoro.fillScreen")
+    static let pomodoroResetSize = Notification.Name("pomodoro.resetSize")
+}
+
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let settings = AppSettings.shared
     private let engine = PomodoroEngine.shared
@@ -45,8 +50,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         ) { [weak self] _ in
             guard let self, let panel = self.panel else { return }
             self.settings.data.windowWidth = Double(panel.frame.width)
+            self.settings.data.windowHeight = Double(panel.frame.height)
             self.settings.data.windowOrigin = [Double(panel.frame.origin.x), Double(panel.frame.origin.y)]
         }
+
+        NotificationCenter.default.addObserver(
+            forName: .pomodoroFillScreen, object: nil, queue: .main
+        ) { [weak self] _ in self?.fillScreen() }
+
+        NotificationCenter.default.addObserver(
+            forName: .pomodoroResetSize, object: nil, queue: .main
+        ) { [weak self] _ in self?.resetSize() }
 
         updateStatusTitle()
     }
@@ -83,7 +97,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let gripSize: CGFloat = 15
         grip = ResizeGripView(frame: NSRect(x: rect.width - gripSize, y: 0, width: gripSize, height: gripSize))
         grip.autoresizingMask = [.minXMargin, .maxYMargin]
-        grip.onResize = { [weak self] width in self?.setPanelWidth(width) }
+        grip.onResize = { [weak self] size in self?.setPanelSize(size) }
         container.addSubview(grip)
 
         panel.contentView = container
@@ -106,20 +120,41 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     /// Resizes around the top-left corner, so the panel grows downward and to the right.
-    private func setPanelWidth(_ requested: CGFloat) {
+    private func setPanelSize(_ requested: CGSize) {
         guard let panel else { return }
-        let base = AppSettings.baseSize
-        let width = min(AppSettings.maxWidth, max(AppSettings.minWidth, requested)).rounded()
-        let height = (width * base.height / base.width).rounded()
+        let screen = (panel.screen ?? NSScreen.main ?? NSScreen.screens[0]).visibleFrame
+        let width = min(screen.width, max(AppSettings.minSize.width, requested.width)).rounded()
+        let height = min(screen.height, max(AppSettings.minSize.height, requested.height)).rounded()
         guard abs(panel.frame.width - width) > 0.5 || abs(panel.frame.height - height) > 0.5 else { return }
         let top = panel.frame.maxY
         panel.setFrame(NSRect(x: panel.frame.origin.x, y: top - height, width: width, height: height),
                        display: true)
     }
 
+    /// Covers the whole screen, minus the menu bar and the Dock — which stay reachable
+    /// on purpose, so the panel can always be shrunk back from the menu bar item.
+    @objc private func fillScreen() {
+        guard let panel else { return }
+        let visible = (panel.screen ?? NSScreen.main ?? NSScreen.screens[0]).visibleFrame
+        panel.setFrame(visible, display: true)
+        panel.orderFrontRegardless()
+    }
+
+    @objc private func resetSize() {
+        guard let panel else { return }
+        let top = panel.frame.maxY
+        panel.setFrame(NSRect(x: panel.frame.origin.x,
+                              y: top - AppSettings.baseSize.height,
+                              width: AppSettings.baseSize.width,
+                              height: AppSettings.baseSize.height),
+                       display: true)
+        panel.orderFrontRegardless()
+    }
+
     private func applyAppearance() {
         guard let panel, let effectView else { return }
-        setPanelWidth(CGFloat(settings.data.windowWidth))
+        setPanelSize(CGSize(width: CGFloat(settings.data.windowWidth),
+                            height: CGFloat(settings.data.windowHeight)))
         panel.alphaValue = settings.data.windowOpacity
         effectView.isHidden = settings.data.blurLevel == 0
         effectView.material = blurMaterial(for: settings.data.blurLevel)
@@ -143,6 +178,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(NSMenuItem(title: "Restart block", action: #selector(restartBlock), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "Restart sequence", action: #selector(restartSequence), keyEquivalent: ""))
         menu.addItem(.separator())
+        menu.addItem(NSMenuItem(title: "Fill screen", action: #selector(fillScreen), keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: "Reset size", action: #selector(resetSize), keyEquivalent: ""))
+        menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "Hide Timer", action: #selector(toggleTimerWindow), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "Settings…", action: #selector(showSettings), keyEquivalent: ","))
         menu.addItem(.separator())
@@ -156,7 +194,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.item(at: 0)?.title = engine.isRunning ? "Pause" : "Start"
-        menu.item(at: 5)?.title = (panel?.isVisible ?? false) ? "Hide Timer" : "Show Timer"
+        menu.item(withTitle: "Hide Timer")?.title = (panel?.isVisible ?? false) ? "Hide Timer" : "Show Timer"
+        menu.item(withTitle: "Show Timer")?.title = (panel?.isVisible ?? false) ? "Hide Timer" : "Show Timer"
     }
 
     // MARK: - Actions
@@ -178,7 +217,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func showSettings() {
         if settingsWindow == nil {
             let window = NSWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 470, height: 430),
+                contentRect: NSRect(x: 0, y: 0, width: 470, height: 480),
                 styleMask: [.titled, .closable],
                 backing: .buffered,
                 defer: false

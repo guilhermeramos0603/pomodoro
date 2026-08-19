@@ -5,12 +5,12 @@ import SwiftUI
 /// and exits. Useful for checking the layout without Screen Recording permission.
 /// The system blur cannot be captured this way, so a fake backdrop is drawn instead.
 enum Snapshot {
-    static func run(path: String, width: CGFloat) -> Never {
+    static func run(path: String, width: CGFloat, height: CGFloat?) -> Never {
         let app = NSApplication.shared
         app.setActivationPolicy(.prohibited)
 
         let size = NSSize(width: width,
-                          height: (width * AppSettings.baseSize.height / AppSettings.baseSize.width).rounded())
+                          height: height ?? (width * AppSettings.baseSize.height / AppSettings.baseSize.width).rounded())
         let rect = NSRect(origin: .zero, size: size)
 
         let root = ZStack {

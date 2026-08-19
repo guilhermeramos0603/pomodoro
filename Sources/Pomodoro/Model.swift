@@ -77,12 +77,14 @@ struct SettingsData: Codable, Equatable {
     // Appearance
     var tintOpacity: Double = 0.55      // how black the panel is, 0...1
     var blurLevel: Int = 2              // 0 = no blur, 1...5 = system materials
-    var windowOpacity: Double = 1.0     // whole-window alpha, 0.3...1
+    var windowOpacity: Double = 1.0     // whole-window alpha, 0.2...1
     var allSpaces: Bool = true          // show on every Space and over full-screen apps
-    var windowWidth: Double = 250       // height follows the fixed aspect ratio
 
-    // Window position (nil = place it on first launch)
-    var windowOrigin: [Double]? = nil
+    // Geometry — the window and the content are sized independently.
+    var windowWidth: Double = 250
+    var windowHeight: Double = 172
+    var contentScale: Double = 1.0      // size of the timer itself, 0.5...3
+    var windowOrigin: [Double]? = nil   // nil = place it on first launch
 
     /// The sequence the engine actually runs.
     var blocks: [Block] {
@@ -100,6 +102,41 @@ struct SettingsData: Codable, Equatable {
             }
             return out
         }
+    }
+}
+
+extension SettingsData {
+    enum CodingKeys: String, CodingKey {
+        case mode, focusMinutes, shortBreakMinutes, longBreakMinutes, roundsBeforeLongBreak
+        case customBlocks, autoStartBreaks, autoStartFocus, soundEnabled, soundName
+        case tintOpacity, blurLevel, windowOpacity, allSpaces
+        case windowWidth, windowHeight, contentScale, windowOrigin
+    }
+
+    /// Lenient on purpose: a preferences file written by an older build is missing the keys
+    /// added since, and a strict decode would throw away every setting the user has.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        var d = SettingsData()
+        d.mode = try c.decodeIfPresent(SequenceMode.self, forKey: .mode) ?? d.mode
+        d.focusMinutes = try c.decodeIfPresent(Int.self, forKey: .focusMinutes) ?? d.focusMinutes
+        d.shortBreakMinutes = try c.decodeIfPresent(Int.self, forKey: .shortBreakMinutes) ?? d.shortBreakMinutes
+        d.longBreakMinutes = try c.decodeIfPresent(Int.self, forKey: .longBreakMinutes) ?? d.longBreakMinutes
+        d.roundsBeforeLongBreak = try c.decodeIfPresent(Int.self, forKey: .roundsBeforeLongBreak) ?? d.roundsBeforeLongBreak
+        d.customBlocks = try c.decodeIfPresent([Block].self, forKey: .customBlocks) ?? d.customBlocks
+        d.autoStartBreaks = try c.decodeIfPresent(Bool.self, forKey: .autoStartBreaks) ?? d.autoStartBreaks
+        d.autoStartFocus = try c.decodeIfPresent(Bool.self, forKey: .autoStartFocus) ?? d.autoStartFocus
+        d.soundEnabled = try c.decodeIfPresent(Bool.self, forKey: .soundEnabled) ?? d.soundEnabled
+        d.soundName = try c.decodeIfPresent(String.self, forKey: .soundName) ?? d.soundName
+        d.tintOpacity = try c.decodeIfPresent(Double.self, forKey: .tintOpacity) ?? d.tintOpacity
+        d.blurLevel = try c.decodeIfPresent(Int.self, forKey: .blurLevel) ?? d.blurLevel
+        d.windowOpacity = try c.decodeIfPresent(Double.self, forKey: .windowOpacity) ?? d.windowOpacity
+        d.allSpaces = try c.decodeIfPresent(Bool.self, forKey: .allSpaces) ?? d.allSpaces
+        d.windowWidth = try c.decodeIfPresent(Double.self, forKey: .windowWidth) ?? d.windowWidth
+        d.windowHeight = try c.decodeIfPresent(Double.self, forKey: .windowHeight) ?? d.windowHeight
+        d.contentScale = try c.decodeIfPresent(Double.self, forKey: .contentScale) ?? d.contentScale
+        d.windowOrigin = try c.decodeIfPresent([Double].self, forKey: .windowOrigin) ?? d.windowOrigin
+        self = d
     }
 }
 

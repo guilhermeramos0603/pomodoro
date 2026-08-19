@@ -20,12 +20,9 @@ final class FloatingPanel: NSPanel {
         animationBehavior = .utilityWindow
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
 
-        // Every resize keeps the panel's proportions, so one scale factor drives the layout.
-        contentAspectRatio = AppSettings.baseSize
-        contentMinSize = NSSize(width: AppSettings.minWidth,
-                                height: AppSettings.minWidth * AppSettings.baseSize.height / AppSettings.baseSize.width)
-        contentMaxSize = NSSize(width: AppSettings.maxWidth,
-                                height: AppSettings.maxWidth * AppSettings.baseSize.height / AppSettings.baseSize.width)
+        // Free resize in both axes, all the way up to the whole screen.
+        contentMinSize = AppSettings.minSize
+        contentMaxSize = NSSize(width: 20_000, height: 20_000)
     }
 
     // Needed so buttons and the context menu respond without activating the app.
@@ -79,10 +76,10 @@ final class RoundedContainerView: NSView {
 /// Corner grip: drag it to resize the panel. Lives above the SwiftUI content so it
 /// wins the mouse, and opts out of window dragging so a drag here never moves the window.
 final class ResizeGripView: NSView {
-    /// Called with the requested new width while dragging.
-    var onResize: ((CGFloat) -> Void)?
+    /// Called with the requested new size while dragging.
+    var onResize: ((CGSize) -> Void)?
 
-    private var startWidth: CGFloat = 0
+    private var startSize: CGSize = .zero
     private var startMouse: NSPoint = .zero
 
     override var mouseDownCanMoveWindow: Bool { false }
@@ -92,13 +89,15 @@ final class ResizeGripView: NSView {
     }
 
     override func mouseDown(with event: NSEvent) {
-        startWidth = window?.frame.width ?? 0
+        startSize = window?.frame.size ?? .zero
         startMouse = NSEvent.mouseLocation
     }
 
     override func mouseDragged(with event: NSEvent) {
         let now = NSEvent.mouseLocation
-        onResize?(startWidth + (now.x - startMouse.x))
+        // Screen y grows upward, so dragging down (negative dy) makes the panel taller.
+        onResize?(CGSize(width: startSize.width + (now.x - startMouse.x),
+                         height: startSize.height - (now.y - startMouse.y)))
     }
 
     override func draw(_ dirtyRect: NSRect) {
