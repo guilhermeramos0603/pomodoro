@@ -137,9 +137,13 @@ private struct TimerTab: View {
                 ForEach(blocks) { block in
                     Text(block.kind.shortLabel)
                         .font(.system(size: 10, weight: .bold, design: .rounded))
-                        .foregroundColor(.white)
+                        .foregroundColor(.primary.opacity(block.kind == .focus ? 0.95 : 0.55))
                         .frame(width: 17, height: 17)
-                        .background(Circle().fill(block.kind.color))
+                        .background(
+                            Circle()
+                                .strokeBorder(Color.primary.opacity(0.35), lineWidth: 1)
+                                .background(Circle().fill(Color.primary.opacity(block.kind == .focus ? 0.14 : 0.05)))
+                        )
                 }
                 Text("↻  \(total) min total")
                     .font(.caption)
@@ -216,6 +220,20 @@ private struct AppearanceTab: View {
                 }
                 Slider(value: $settings.data.windowOpacity, in: 0.2...1)
                 Text("Fades the whole panel, text included.")
+                    .font(.caption).foregroundColor(.secondary)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text("Size")
+                    Spacer()
+                    Text("\(Int(settings.data.windowWidth)) pt wide")
+                        .monospacedDigit()
+                        .foregroundColor(.secondary)
+                }
+                Slider(value: $settings.data.windowWidth,
+                       in: Double(AppSettings.minWidth)...Double(AppSettings.maxWidth))
+                Text("You can also drag the grip in the panel's bottom-right corner, or any of its edges.")
                     .font(.caption).foregroundColor(.secondary)
             }
 

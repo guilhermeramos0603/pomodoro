@@ -36,6 +36,16 @@ final class AppSettings: ObservableObject {
         data = fresh
     }
 
+    /// Panel geometry: the height always follows the base aspect ratio.
+    static let baseSize = CGSize(width: 250, height: 172)
+    static let minWidth: CGFloat = 170
+    static let maxWidth: CGFloat = 700
+
+    var panelSize: CGSize {
+        let w = min(Self.maxWidth, max(Self.minWidth, CGFloat(data.windowWidth)))
+        return CGSize(width: w.rounded(), height: (w * Self.baseSize.height / Self.baseSize.width).rounded())
+    }
+
     /// Fills the custom sequence with what the classic settings would generate.
     func copyClassicIntoCustom() {
         var classic = data

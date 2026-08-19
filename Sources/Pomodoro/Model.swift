@@ -25,11 +25,12 @@ enum BlockKind: String, Codable, CaseIterable, Identifiable {
         }
     }
 
+    /// Monochrome on purpose: phases read as brightness tiers, not as hues.
     var color: Color {
         switch self {
-        case .focus:      return Color(red: 1.00, green: 0.42, blue: 0.35)
-        case .shortBreak: return Color(red: 0.35, green: 0.82, blue: 0.60)
-        case .longBreak:  return Color(red: 0.40, green: 0.65, blue: 1.00)
+        case .focus:      return Color.white.opacity(0.92)
+        case .shortBreak: return Color.white.opacity(0.38)
+        case .longBreak:  return Color.white.opacity(0.62)
         }
     }
 
@@ -78,6 +79,7 @@ struct SettingsData: Codable, Equatable {
     var blurLevel: Int = 2              // 0 = no blur, 1...5 = system materials
     var windowOpacity: Double = 1.0     // whole-window alpha, 0.3...1
     var allSpaces: Bool = true          // show on every Space and over full-screen apps
+    var windowWidth: Double = 250       // height follows the fixed aspect ratio
 
     // Window position (nil = place it on first launch)
     var windowOrigin: [Double]? = nil

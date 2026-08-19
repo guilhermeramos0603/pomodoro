@@ -10,9 +10,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var effectView: DraggableEffectView!
     private var statusItem: NSStatusItem!
     private var settingsWindow: NSWindow?
+    private var grip: ResizeGripView!
     private var bag = Set<AnyCancellable>()
-
-    private static let panelSize = NSSize(width: 250, height: 172)
 
     // MARK: - Lifecycle
 
@@ -41,13 +40,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             self.settings.data.windowOrigin = [Double(panel.frame.origin.x), Double(panel.frame.origin.y)]
         }
 
+        NotificationCenter.default.addObserver(
+            forName: NSWindow.didResizeNotification, object: panel, queue: .main
+        ) { [weak self] _ in
+            guard let self, let panel = self.panel else { return }
+            self.settings.data.windowWidth = Double(panel.frame.width)
+            self.settings.data.windowOrigin = [Double(panel.frame.origin.x), Double(panel.frame.origin.y)]
+        }
+
         updateStatusTitle()
     }
 
     // MARK: - Panel
 
     private func buildPanel() {
-        let rect = NSRect(origin: .zero, size: Self.panelSize)
+        let rect = NSRect(origin: .zero, size: settings.panelSize)
         panel = FloatingPanel(contentRect: rect)
 
         let container = RoundedContainerView(frame: rect)
@@ -72,6 +79,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         host.autoresizingMask = [.width, .height]
         container.addSubview(host)
 
+        // Sits above the SwiftUI content so a drag in the corner resizes instead of moving.
+        let gripSize: CGFloat = 15
+        grip = ResizeGripView(frame: NSRect(x: rect.width - gripSize, y: 0, width: gripSize, height: gripSize))
+        grip.autoresizingMask = [.minXMargin, .maxYMargin]
+        grip.onResize = { [weak self] width in self?.setPanelWidth(width) }
+        container.addSubview(grip)
+
         panel.contentView = container
         placePanel()
         panel.orderFrontRegardless()
@@ -87,12 +101,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
         }
         let visible = (NSScreen.main ?? NSScreen.screens[0]).visibleFrame
-        panel.setFrameOrigin(NSPoint(x: visible.maxX - Self.panelSize.width - 24,
-                                     y: visible.maxY - Self.panelSize.height - 24))
+        panel.setFrameOrigin(NSPoint(x: visible.maxX - settings.panelSize.width - 24,
+                                     y: visible.maxY - settings.panelSize.height - 24))
+    }
+
+    /// Resizes around the top-left corner, so the panel grows downward and to the right.
+    private func setPanelWidth(_ requested: CGFloat) {
+        guard let panel else { return }
+        let base = AppSettings.baseSize
+        let width = min(AppSettings.maxWidth, max(AppSettings.minWidth, requested)).rounded()
+        let height = (width * base.height / base.width).rounded()
+        guard abs(panel.frame.width - width) > 0.5 || abs(panel.frame.height - height) > 0.5 else { return }
+        let top = panel.frame.maxY
+        panel.setFrame(NSRect(x: panel.frame.origin.x, y: top - height, width: width, height: height),
+                       display: true)
     }
 
     private func applyAppearance() {
         guard let panel, let effectView else { return }
+        setPanelWidth(CGFloat(settings.data.windowWidth))
         panel.alphaValue = settings.data.windowOpacity
         effectView.isHidden = settings.data.blurLevel == 0
         effectView.material = blurMaterial(for: settings.data.blurLevel)

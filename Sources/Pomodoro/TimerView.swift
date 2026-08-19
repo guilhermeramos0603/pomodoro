@@ -1,5 +1,7 @@
 import SwiftUI
 
+/// The panel UI. Everything is sized from `s`, the ratio between the current window
+/// width and the base width — real point sizes, so text stays sharp at any size.
 struct TimerView: View {
     @ObservedObject var engine: PomodoroEngine
     @ObservedObject var settings: AppSettings
@@ -11,20 +13,23 @@ struct TimerView: View {
     private var kind: BlockKind { engine.currentBlock.kind }
 
     var body: some View {
-        ZStack {
-            Color.black.opacity(settings.data.tintOpacity)
+        GeometryReader { geo in
+            let s = max(0.55, min(3.0, geo.size.width / AppSettings.baseSize.width))
 
-            VStack(spacing: 8) {
-                header
-                time
-                progressBar
-                sequenceStrip
-                controls
+            ZStack {
+                Color.black.opacity(settings.data.tintOpacity)
+
+                VStack(spacing: 8 * s) {
+                    header(s)
+                    time(s)
+                    progressBar(s)
+                    sequenceStrip(s)
+                    controls(s)
+                }
+                .padding(.horizontal, 16 * s)
+                .padding(.vertical, 13 * s)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 13)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .contextMenu {
             Button("Settings…", action: onSettings)
             Button("Hide Timer", action: onHide)
@@ -35,84 +40,88 @@ struct TimerView: View {
 
     // MARK: - Pieces
 
-    private var header: some View {
-        HStack(spacing: 6) {
+    private func header(_ s: CGFloat) -> some View {
+        HStack(spacing: 6 * s) {
             Circle()
                 .fill(kind.color)
-                .frame(width: 6, height: 6)
+                .frame(width: 6 * s, height: 6 * s)
                 .opacity(engine.isRunning ? 1 : 0.45)
 
             Text(kind.label.uppercased())
-                .font(.system(size: 9.5, weight: .semibold))
-                .tracking(1.4)
-                .foregroundColor(.white.opacity(0.72))
+                .font(.system(size: 9.5 * s, weight: .semibold))
+                .tracking(1.4 * s)
+                .foregroundColor(.white.opacity(0.62))
+                .lineLimit(1)
 
-            Spacer(minLength: 4)
+            Spacer(minLength: 4 * s)
 
             Text("\(engine.index + 1)/\(max(engine.blocks.count, 1))")
-                .font(.system(size: 9.5, weight: .medium).monospacedDigit())
+                .font(.system(size: 9.5 * s, weight: .medium).monospacedDigit())
                 .foregroundColor(.white.opacity(0.35))
         }
     }
 
-    private var time: some View {
+    private func time(_ s: CGFloat) -> some View {
         Text(engine.timeString)
-            .font(.system(size: 44, weight: .thin, design: .rounded).monospacedDigit())
+            .font(.system(size: 44 * s, weight: .thin, design: .rounded).monospacedDigit())
             .foregroundColor(.white.opacity(engine.isRunning ? 0.96 : 0.62))
+            .minimumScaleFactor(0.5)
+            .lineLimit(1)
             .contentTransition(.numericText())
             .animation(.easeOut(duration: 0.15), value: engine.timeString)
     }
 
-    private var progressBar: some View {
+    private func progressBar(_ s: CGFloat) -> some View {
         GeometryReader { geo in
             ZStack(alignment: .leading) {
-                Capsule().fill(Color.white.opacity(0.13))
+                Capsule().fill(Color.white.opacity(0.10))
                 Capsule()
-                    .fill(kind.color)
+                    .fill(Color.white.opacity(0.80))
                     .frame(width: max(0, geo.size.width * engine.progress))
             }
         }
-        .frame(height: 3)
+        .frame(height: 3 * s)
     }
 
-    private var sequenceStrip: some View {
-        HStack(spacing: 3) {
+    private func sequenceStrip(_ s: CGFloat) -> some View {
+        HStack(spacing: 3 * s) {
             ForEach(Array(engine.blocks.enumerated()), id: \.element.id) { position, block in
                 Capsule()
                     .fill(block.kind.color)
                     .opacity(position == engine.index ? 1 : (position < engine.index ? 0.55 : 0.2))
-                    .frame(width: block.kind == .focus ? 14 : 7, height: 3)
+                    .frame(width: (block.kind == .focus ? 14 : (block.kind == .longBreak ? 10 : 6)) * s, height: 3 * s)
                     .onTapGesture { engine.jump(to: position) }
             }
         }
-        .frame(height: 4)
+        .frame(height: 4 * s)
         .frame(maxWidth: .infinity, alignment: .center)
     }
 
-    private var controls: some View {
-        HStack(spacing: 12) {
-            ControlButton(symbol: "arrow.counterclockwise", size: 12) { engine.reset() }
+    private func controls(_ s: CGFloat) -> some View {
+        HStack(spacing: 12 * s) {
+            ControlButton(symbol: "arrow.counterclockwise", scale: s) { engine.reset() }
                 .help("Restart this block")
 
-            PrimaryButton(symbol: engine.isRunning ? "pause.fill" : "play.fill", color: kind.color) {
-                engine.toggle()
-            }
+            PrimaryButton(symbol: engine.isRunning ? "pause.fill" : "play.fill",
+                          scale: s) { engine.toggle() }
 
-            ControlButton(symbol: "forward.end.fill", size: 12) { engine.skip() }
+            ControlButton(symbol: "forward.end", scale: s) { engine.skip() }
                 .help("Skip to the next block")
 
             Spacer(minLength: 0)
 
-            ControlButton(symbol: "gearshape.fill", size: 12, action: onSettings)
+            ControlButton(symbol: "gearshape", scale: s, action: onSettings)
                 .help("Settings")
+                // keeps the gear clear of the resize grip in the corner
+                .padding(.trailing, 3 * s)
         }
-        .padding(.top, 1)
+        .padding(.top, 1 * s)
     }
 }
 
 private struct PrimaryButton: View {
     let symbol: String
-    let color: Color
+    let scale: CGFloat
     let action: () -> Void
 
     @State private var hovering = false
@@ -121,13 +130,12 @@ private struct PrimaryButton: View {
         Button(action: action) {
             ZStack {
                 Circle()
-                    .fill(color)
-                    .frame(width: 30, height: 30)
-                    .brightness(hovering ? 0.08 : 0)
+                    .fill(Color.white.opacity(hovering ? 1.0 : 0.90))
+                    .frame(width: 30 * scale, height: 30 * scale)
                 Image(systemName: symbol)
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundColor(.black.opacity(0.85))
-                    .offset(x: symbol == "play.fill" ? 1 : 0)
+                    .font(.system(size: 12 * scale, weight: .bold))
+                    .foregroundColor(.black.opacity(0.80))
+                    .offset(x: symbol == "play.fill" ? 1 * scale : 0)
             }
         }
         .buttonStyle(.plain)
@@ -137,7 +145,7 @@ private struct PrimaryButton: View {
 
 private struct ControlButton: View {
     let symbol: String
-    var size: CGFloat = 12
+    let scale: CGFloat
     let action: () -> Void
 
     @State private var hovering = false
@@ -145,9 +153,9 @@ private struct ControlButton: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: symbol)
-                .font(.system(size: size, weight: .medium))
+                .font(.system(size: 12 * scale, weight: .medium))
                 .foregroundColor(.white.opacity(hovering ? 0.95 : 0.5))
-                .frame(width: 22, height: 22)
+                .frame(width: 22 * scale, height: 22 * scale)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
